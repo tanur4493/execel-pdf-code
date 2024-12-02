@@ -1,0 +1,125 @@
+  
+RTGS Controller
+
+
+public function index(Request $request)
+{
+    // Query to fetch RTGS records and join with Company to get the company name
+    $query = Rtgs::join('companies', 'rtgs.company_id', '=', 'companies.id')
+                 ->select('rtgs.*', 'companies.name as company_name') // Select RTGS fields and the company name
+                 ->orderBy('rtgs.id', 'DESC');
+
+    // Filter the results based on request parameters
+    if ($request->name) {
+        $query->where('rtgs.name', '=', $request->name);
+    }
+    
+    if ($request->company_id) {
+        $query->where('rtgs.company_id', '=', $request->company_id);
+    }
+   
+  
+    
+    // $startDate = $request->start_date;
+    // $endDate = $request->end_date;
+
+    // if ($startDate && $endDate) {
+    //     // Filter records between the given dates
+    //     $query->whereDate('rtgs.created_at', '>=', $startDate)
+    //           ->whereDate('rtgs.created_at', '<=', $endDate);
+    // } elseif ($startDate) {
+    //     // Filter records from the start date onwards
+    //     $query->whereDate('rtgs.created_at', '>=', $startDate);
+    // } elseif ($endDate) {
+    //     // Filter records up to the end date
+    //     $query->whereDate('rtgs.created_at', '<=', $endDate);
+    // }
+
+
+  // Date filters
+    $startDate = $request->start_date;
+    $endDate = $request->end_date;
+
+    if ($startDate || $endDate) {
+        if ($startDate) {
+            // Filter from the start date onwards
+            $query->whereDate('rtgs.created_at', '>=', $startDate);
+        }
+        if ($endDate) {
+            // Filter up to the end date
+            $query->whereDate('rtgs.created_at', '<=', $endDate);
+        }
+    }
+
+   
+   
+   
+   
+    if ($request->supplier_id) {
+        $query->where('rtgs.supplier_id', '=', $request->supplier_id);
+    }
+    
+     if ($request->cheque_no) {
+        $query->where('rtgs.cheque', '=', $request->cheque_no);
+    }
+    
+    
+    // Handle CSV export
+    if ($request->export === 'csv') {
+        $data = $query->get();
+
+        // Define the headers for the file
+        $headers = [
+            'ID', 'Name', 'Company Name', 'Amount', 'Created At'
+        ];
+
+        // Open output stream to write data
+        $filename = "rtgs_list_" . now()->format('Ymd_His') . ".csv";
+        $output = fopen('php://output', 'w');
+
+        // Send headers to prompt download
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        // Write the headers
+        fputcsv($output, $headers);
+
+        // Write each record
+        foreach ($data as $row) {
+            fputcsv($output, [
+                $row->id,
+                $row->name,
+                $row->company_name,
+                $row->amount,
+                $row->created_at,
+            ]);
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    // Handle normal request
+    if ($request->ajax()) {
+        $data = $query->get();
+        return response()->json(['status' => true, 'message' => 'RTGS List', 'data' => $data]);
+    } else {
+        $data['items'] = $query->paginate(20);
+        return view('admin.Rtgs.index', $data);
+    }
+
+    if ($request->ajax()) {
+        $data = $query->get();
+        return response()->json(['status' => true, 'message' => 'RTGS List', 'data' => $data]);
+    } else {
+        $data['items'] = $query->paginate(20); // Paginate the results
+        return view('admin.Rtgs.index', $data);
+    }
+}
+
+
+
+
+RTGS VIEW BUTTON
+
+<a href="{{ url('admin/rtgs?export=csv') }}" class="btn btn-success">Export to CSV</a>
